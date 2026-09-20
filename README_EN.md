@@ -2,7 +2,7 @@
 
 # KernelSU Action
 
-A GitHub Actions workflow that integrates KernelSU (and its forks), SUSFS and the common kernel patches into an Android kernel, and produces a flashable AnyKernel3 package.
+A GitHub Actions workflow that integrates KernelSU (and its forks), SUSFS and the common kernel patches into an Android kernel, and produces a flashable complete boot.img or an AnyKernel3 package.
 
 Assumes some familiarity with Android kernels.
 
@@ -25,7 +25,7 @@ If you are not the kernel author, please keep KernelSU builds made from someone 
 2. Edit [`config.env`](config.env) — at minimum `KERNEL_SOURCE`, `KERNEL_SOURCE_BRANCH`, `KERNEL_CONFIG` and `KERNEL_IMAGE_NAME`.
 3. Go to `Actions` → `Build Kernel` → `Run workflow`.
 4. Pick your KernelSU variant, whether to enable SUSFS, and so on, then run it.
-5. Download the AnyKernel3 artifact and flash it from a custom recovery.
+5. Download the artifact: a complete `boot.img` (`fastboot flash boot boot.img`) or an AnyKernel3 zip (flash it from a custom recovery), depending on `BUILD_BOOT_IMG` and `ENABLE_ANYKERNEL3` in your profile.
 
 The dropdowns all default to `config`, meaning "use whatever the config file says". They **override** the matching key in `config.env` only when you actively change them, so day-to-day tweaking needs no commits — and simply hitting Run always builds exactly what your profile describes, rather than silently switching off a feature you enabled because some checkbox defaulted to off.
 
@@ -126,7 +126,8 @@ Every key is documented inline in [`config.env`](config.env). The ones people to
 | `DISABLE_LTO` | LTO optimises the kernel but sometimes breaks the build |
 | `DISABLE_CC_WERROR` | Fixes kernels that turn KernelSU's warnings into errors |
 | `EXTRA_DEFCONFIG` | Arbitrary extra defconfig lines, e.g. `CONFIG_TMPFS_XATTR=y` |
-| `BUILD_BOOT_IMG` + `SOURCE_BOOT_IMAGE` | Repack a boot.img; needs a direct link to a bootable image from the same device and ROM |
+| `ENABLE_ANYKERNEL3` | Build the AnyKernel3 flashable zip (default `true`); set to `false` together with `BUILD_BOOT_IMG` to ship only the complete boot.img |
+| `BUILD_BOOT_IMG` + `SOURCE_BOOT_IMAGE` | Repack a complete boot.img; `SOURCE_BOOT_IMAGE` may be a direct link, a `file://` URL, or a repo-relative path (default `boot/boot.img`) |
 | `KSU_EXPECTED_SIZE` / `KSU_EXPECTED_HASH` | Custom manager signature, from `ksud debug get-sign <apk>` |
 
 ## Backwards compatibility

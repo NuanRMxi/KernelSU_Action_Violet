@@ -12,6 +12,10 @@ BOOT_OUT="${KERNEL_DIR}/out/arch/${ARCH}/boot"
 AK3="${WORKSPACE}/AnyKernel3"
 
 make_anykernel3() {
+	if ! is_true "${ENABLE_ANYKERNEL3:-true}"; then
+		info "ENABLE_ANYKERNEL3=false; skipping AnyKernel3 packaging"
+		return 0
+	fi
 	group "Building AnyKernel3 package"
 	rm -rf "$AK3"
 
@@ -49,6 +53,7 @@ make_anykernel3() {
 	rm -rf "${AK3}/.git" "${AK3}/.github" "${AK3}/README.md"
 
 	ok "AnyKernel3 package assembled"
+	export_env ANYKERNEL3_IS_OK true
 	endgroup
 }
 

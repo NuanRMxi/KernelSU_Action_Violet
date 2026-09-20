@@ -73,6 +73,7 @@ declare -A DEFAULTS=(
 	[EXTRA_DEFCONFIG]=""
 
 	# Packaging
+	[ENABLE_ANYKERNEL3]="true"
 	[USE_CUSTOM_ANYKERNEL3]="false"
 	[CUSTOM_ANYKERNEL3_SOURCE]=""
 	[CUSTOM_ANYKERNEL3_BRANCH]=""
@@ -220,6 +221,13 @@ validate() {
 
 	if is_true "${CFG[BUILD_BOOT_IMG]}" && [ -z "${CFG[SOURCE_BOOT_IMAGE]}" ]; then
 		_err "BUILD_BOOT_IMG=true requires SOURCE_BOOT_IMAGE"
+	fi
+
+	# AnyKernel3 and the repacked boot image are the two flashable outputs; a
+	# build that turns both off still uploads the raw kernel binary, but almost
+	# always means a config mistake rather than an intent.
+	if ! is_true "${CFG[ENABLE_ANYKERNEL3]}" && ! is_true "${CFG[BUILD_BOOT_IMG]}"; then
+		_err "ENABLE_ANYKERNEL3=false requires BUILD_BOOT_IMG=true (nothing flashable would be packaged)"
 	fi
 
 	if is_true "${CFG[USE_CUSTOM_CLANG]}" && [ -z "${CFG[CUSTOM_CLANG_SOURCE]}" ]; then

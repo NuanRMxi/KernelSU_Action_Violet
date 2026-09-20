@@ -2,7 +2,7 @@
 
 # KernelSU Action
 
-用 GitHub Actions 为 Android 内核集成 KernelSU（及其各种分支）、SUSFS 与常用补丁，并产出可刷入的 AnyKernel3 包。
+用 GitHub Actions 为 Android 内核集成 KernelSU（及其各种分支）、SUSFS 与常用补丁，并产出可刷入的完整 boot.img 或 AnyKernel3 包。
 
 需要一定的内核与 Android 基础知识。
 
@@ -25,7 +25,7 @@
 2. 编辑 [`config.env`](config.env)，至少填好 `KERNEL_SOURCE`、`KERNEL_SOURCE_BRANCH`、`KERNEL_CONFIG`、`KERNEL_IMAGE_NAME`。
 3. 打开 `Actions` → `Build Kernel` → `Run workflow`。
 4. 在弹出的表单里选择 KernelSU 分支、是否启用 SUSFS 等，然后运行。
-5. 构建完成后在 Artifacts 下载 AnyKernel3 压缩包，在 Recovery 中刷入。
+5. 构建完成后在 Artifacts 下载产物：产出完整 `boot.img`（`fastboot flash boot boot.img`），或 AnyKernel3 压缩包（Recovery 刷入），取决于配置里的 `BUILD_BOOT_IMG` 与 `ENABLE_ANYKERNEL3`。
 
 表单里的下拉框默认都是 `config`，意思是"用配置文件里写的值"。只有你主动改成别的值时，它才会**覆盖** `config.env` 中的同名配置——所以日常调参不需要提交任何改动，而直接点运行也一定是按你配置文件里的设定来构建，不会因为某个开关默认关着就把你配置里开启的功能悄悄关掉。
 
@@ -122,7 +122,8 @@ AOSP 的 clang 预编译仓库有个陷阱：每个 `kernel-build` 分支都会�
 | `DISABLE_LTO` | LTO 会优化内核，但有时会导致编译错误 |
 | `DISABLE_CC_WERROR` | 修复某些内核把 KernelSU 的告警当错误的问题 |
 | `EXTRA_DEFCONFIG` | 任意追加 defconfig 行，如 `CONFIG_TMPFS_XATTR=y` |
-| `BUILD_BOOT_IMG` + `SOURCE_BOOT_IMAGE` | 重新打包 boot.img，需要提供同设备同 ROM 的可开机镜像直链 |
+| `ENABLE_ANYKERNEL3` | 是否打包 AnyKernel3 刷机包，默认 `true`；设为 `false` 时需同时开启 `BUILD_BOOT_IMG` |
+| `BUILD_BOOT_IMG` + `SOURCE_BOOT_IMAGE` | 重新打包完整 boot.img；`SOURCE_BOOT_IMAGE` 支持直链、`file://` 或仓库内相对路径（默认 `boot/boot.img`） |
 | `KSU_EXPECTED_SIZE` / `KSU_EXPECTED_HASH` | 自定义管理器签名，用 `ksud debug get-sign <apk>` 获取 |
 
 ## 兼容旧配置

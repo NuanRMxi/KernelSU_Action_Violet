@@ -246,6 +246,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload AnyKernel3
+        if: env.ANYKERNEL3_IS_OK == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: AnyKernel3${{ env.LOCALVERSION }}${{ env.UPLOADNAME }}-${{ env.DEVICE }}-${{ env.BUILD_TIME }}
@@ -309,5 +310,6 @@ jobs:
             | KernelSU | `${{ needs.build.outputs.ksu_name }}` @ `${{ needs.build.outputs.ksu_version }}` |
             | SUSFS | `${{ needs.build.outputs.susfs_version || 'not applied' }}` |
 
-            Flash the AnyKernel3 zip from a custom recovery.
+            Flash `boot.img` with fastboot (`fastboot flash boot boot.img`),
+            or the AnyKernel3 zip from a custom recovery when one is attached.
           files: release/*

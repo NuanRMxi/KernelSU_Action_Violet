@@ -103,13 +103,29 @@ retry() {
 
 # ------------------------------------------------------------- downloading ---
 
-# fetch URL DEST -- resumable, retrying download.
+# fetch SRC DEST -- resumable, retrying download, or a local copy.
+#
+# SRC may be a URL, a file:// URL, or a path (relative to the calling process's
+# cwd, i.e. the repo root in CI). Local sources are what let SOURCE_BOOT_IMAGE
+# point at the boot image committed under boot/ instead of a remote copy of it.
 fetch() {
-	local url=$1 dest=$2
-	info "fetching ${url}"
-	retry 4 curl -fsSL --connect-timeout 30 --retry 3 --retry-delay 3 -o "$dest" "$url" \
-		|| die "failed to download ${url}"
-	[ -s "$dest" ] || die "downloaded file is empty: ${url}"
+	local src=$1 dest=$2
+	case "$src" in
+		file://*)
+			src=${src#file://}
+			;;
+		*://*)
+			info "fetching ${src}"
+			retry 4 curl -fsSL --connect-timeout 30 --retry 3 --retry-delay 3 -o "$dest" "$src" \
+				|| die "failed to download ${src}"
+			[ -s "$dest" ] || die "downloaded file is empty: ${src}"
+			return 0
+			;;
+	esac
+	[ -f "$src" ] || die "local file not found: ${src} (not a URL either)"
+	info "copying ${src}"
+	cp -f "$src" "$dest" || die "failed to copy ${src}"
+	[ -s "$dest" ] || die "copied file is empty: ${src}"
 }
 
 # fetch_stdout URL -- print a URL's body, retrying. Used for small text files.
