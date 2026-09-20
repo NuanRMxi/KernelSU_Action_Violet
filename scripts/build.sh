@@ -103,6 +103,37 @@ make_args() {
 	fi
 }
 
+# Some 4.14/4.19 trees invoke scripts/mkdtimg (and a few other helpers) with a
+# python2 shebang.  Modern runners only ship python3, so install a small shim
+# in /usr/local/bin that forwards to python3.  mkdtimg uses only syntax that is
+# valid in both versions, so the shim is enough; if a tree ever needs real
+# python2, its script has to be patched with 2to3 instead.
+ensure_python2_shim() {
+	if command -v python2 >/dev/null 2>&1; then
+		return 0
+	fi
+
+	local shim_dir="/usr/local/bin"
+	local shim="${shim_dir}/python2"
+
+	# /usr/local/bin is writable on GitHub runners without sudo, but fall back
+	# to a workspace-local dir if it is not.
+	if [ ! -w "$shim_dir" ]; then
+		shim_dir="${WORKSPACE}/bin"
+		shim="${shim_dir}/python2"
+		mkdir -p "$shim_dir"
+		export PATH="${shim_dir}:${PATH}"
+	fi
+
+	cat >"$shim" <<'EOF'
+#!/bin/sh
+exec python3 "$@"
+EOF
+	chmod +x "$shim"
+
+	info "installed python2 shim at ${shim} -> python3"
+}
+
 build_kernel() {
 	group "Building kernel"
 	export PATH="${CLANG_PATH:-}:${PATH}"
@@ -122,6 +153,11 @@ build_kernel() {
 		export KSU_EXPECTED_SIZE KSU_EXPECTED_HASH
 		info "using custom manager signature (size=${KSU_EXPECTED_SIZE})"
 	fi
+
+	# Older Android trees (4.14/4.19) ship scripts/mkdtimg with a
+	# `#!/usr/bin/env python2` shebang, and the GitHub runner no longer has a
+	# python2 binary.  Provide a shim so those scripts run under python3.
+	ensure_python2_shim
 
 	local cc="clang" args
 	args=$(make_args)
