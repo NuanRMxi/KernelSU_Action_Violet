@@ -105,10 +105,9 @@ make_args() {
 
 # Some 4.14/4.19 trees invoke scripts/mkdtimg (and a few other helpers) with a
 # python2 shebang.  Modern runners only ship python3, so install a small shim
-# in /usr/local/bin that forwards to python3.  This only handles the
-# interpreter name; scripts that use python2-only syntax (xrange, print
-# statements, iteritems, ...) still have to be rewritten, which is what
-# fix_python2_scripts() below takes care of.
+# in /usr/local/bin that forwards to python3.  mkdtimg uses only syntax that is
+# valid in both versions, so the shim is enough; if a tree ever needs real
+# python2, its script has to be patched with 2to3 instead.
 ensure_python2_shim() {
 	if command -v python2 >/dev/null 2>&1; then
 		return 0
@@ -135,41 +134,6 @@ EOF
 	info "installed python2 shim at ${shim} -> python3"
 }
 
-# Convert python2-only helper scripts inside the kernel tree to python3.
-# The 4.14/4.19 dtbo pipeline uses scripts/dtc/libfdt/mkdtboimg.py, which
-# relies on `xrange` and compares an int with `is`; both are rejected (or
-# warned about) by python3.  2to3 fixes those along with any other py2-isms
-# we have not seen yet.  A few targeted seds run afterwards in case 2to3 is
-# unavailable on the runner.
-fix_python2_scripts() {
-	local scripts=(
-		"${KERNEL_DIR}/scripts/dtc/libfdt/mkdtboimg.py"
-		"${KERNEL_DIR}/scripts/mkdtimg"
-		"${KERNEL_DIR}/scripts/dtc/libfdt/mkdtimg.py"
-	)
-	local script
-
-	for script in "${scripts[@]}"; do
-		[ -f "$script" ] || continue
-
-		if command -v 2to3 >/dev/null 2>&1; then
-			info "converting ${script} to python3 (2to3)"
-			2to3 -w -n "$script" >/dev/null 2>&1 || true
-		else
-			warn "2to3 not available; applying targeted seds to ${script}"
-			sed -i -E 's/\bxrange\(/range(/g'        "$script"
-			sed -i -E 's/\.iteritems\(\)/.items()/g' "$script"
-			sed -i -E 's/\.iterkeys\(\)/.keys()/g'   "$script"
-			sed -i -E 's/\.itervalues\(\)/.values()/g' "$script"
-			sed -i -E 's/if version is 0:/if version == 0:/g' "$script"
-		fi
-
-		# Make sure the shebang points at python3 even if 2to3 missed it.
-		sed -i '1s|^#!/usr/bin/env python2$|#!/usr/bin/env python3|' "$script"
-		sed -i '1s|^#!/usr/bin/python2$|#!/usr/bin/env python3|'    "$script"
-	done
-}
-
 build_kernel() {
 	group "Building kernel"
 	export PATH="${CLANG_PATH:-}:${PATH}"
@@ -190,11 +154,10 @@ build_kernel() {
 		info "using custom manager signature (size=${KSU_EXPECTED_SIZE})"
 	fi
 
-	# Older Android trees (4.14/4.19) ship python2-only helpers used by the
-	# dtbo/dt.img pipeline.  Provide an interpreter shim and rewrite the
-	# scripts so they run under python3.
+	# Older Android trees (4.14/4.19) ship scripts/mkdtimg with a
+	# `#!/usr/bin/env python2` shebang, and the GitHub runner no longer has a
+	# python2 binary.  Provide a shim so those scripts run under python3.
 	ensure_python2_shim
-	fix_python2_scripts
 
 	local cc="clang" args
 	args=$(make_args)
