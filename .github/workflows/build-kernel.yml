@@ -179,11 +179,15 @@ jobs:
         run: |
           # Ubuntu ships no `python` command at all, and the kernel's scripts
           # ask for exactly that, so link `python` and `python2` to the real
-          # Python 2. `shim` also goes first on PATH for later steps: that is
-          # what stops a python3 from the runner's tool cache being picked up
-          # as `python` by mistake.
-          python2_bin=$(command -v python2 || command -v python2.7) \
-            || { echo "::error::python2 is not installed"; exit 1; }
+          # Python 2 binary. Resolving the path first is essential: `command -v
+          # python2` reports the /usr/bin/python2 symlink the package installs,
+          # and `ln -sf <that same name>` would replace it with a symlink that
+          # points at itself, after which nothing named `python` resolves at
+          # all. Link only to the canonical binary.
+          python2_bin=$(command -v python2.7 || command -v python2 || true)
+          [ -n "$python2_bin" ] || { echo "::error::python2 is not installed"; exit 1; }
+          python2_bin=$(readlink -f "$python2_bin")
+          [ -x "$python2_bin" ] || { echo "::error::python2 is not executable"; exit 1; }
           sudo ln -sf "$python2_bin" /usr/bin/python2
           sudo ln -sf "$python2_bin" /usr/bin/python
           shim=/usr/local/bin
@@ -192,6 +196,7 @@ jobs:
           echo "$shim" >>"$GITHUB_PATH"
           export PATH="$shim:$PATH"
           python --version
+          python2 --version
           python -c 'import sys; assert sys.version_info[0] == 2, sys.version' \
             || { echo "::error::python does not resolve to Python 2"; exit 1; }
 
