@@ -98,7 +98,11 @@ permissions:
 jobs:
   build:
     name: Build ${{ inputs.config }}
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: 24.04 dropped the Python 2 packages, and the
+    # vendor kernel trees this repo builds call `python` from their own host
+    # tools (dtbo/boot image generation). Those scripts are Python 2 and cannot
+    # be patched here, so the job must run where python2 can still be installed.
+    runs-on: ubuntu-22.04
     timeout-minutes: 120
     outputs:
       device: ${{ steps.meta.outputs.device }}
@@ -158,12 +162,38 @@ jobs:
           # Kept deliberately lean. The historical list here was copied from the
           # full AOSP platform build docs and pulled in ~40 packages a kernel
           # build never touches, several of which no longer exist on current
-          # Ubuntu (python2, lib32ncurses5-dev, ...).
+          # Ubuntu (lib32ncurses5-dev, ...).
+          #
+          # python2 is required and python3 is deliberately absent. The kernel
+          # tree invokes `python` from its own host tools, and those scripts
+          # predate Python 3; installing python3 would only make `python`
+          # resolve to an interpreter they cannot run under. The next step
+          # points `python`/`python2` at Python 2 and fails if it cannot.
           sudo apt-get install -y --no-install-recommends \
             bc bison build-essential ccache cpio curl device-tree-compiler flex \
-            git libelf-dev libssl-dev lz4 make python3 rsync unzip zip zstd \
+            git libelf-dev libssl-dev lz4 make python2 rsync unzip zip zstd \
             libncurses-dev
           mkdir -p "$WORKSPACE"
+
+      - name: Set up Python 2
+        run: |
+          # Ubuntu ships no `python` command at all, and the kernel's scripts
+          # ask for exactly that, so link `python` and `python2` to the real
+          # Python 2. `shim` also goes first on PATH for later steps: that is
+          # what stops a python3 from the runner's tool cache being picked up
+          # as `python` by mistake.
+          python2_bin=$(command -v python2 || command -v python2.7) \
+            || { echo "::error::python2 is not installed"; exit 1; }
+          sudo ln -sf "$python2_bin" /usr/bin/python2
+          sudo ln -sf "$python2_bin" /usr/bin/python
+          shim=/usr/local/bin
+          sudo ln -sf "$python2_bin" "$shim/python"
+          sudo ln -sf "$python2_bin" "$shim/python2"
+          echo "$shim" >>"$GITHUB_PATH"
+          export PATH="$shim:$PATH"
+          python --version
+          python -c 'import sys; assert sys.version_info[0] == 2, sys.version' \
+            || { echo "::error::python does not resolve to Python 2"; exit 1; }
 
       - name: Set up toolchain
         run: bash scripts/toolchain.sh
