@@ -73,14 +73,25 @@ make_boot_image() {
 		|| die "failed to read the source boot image"
 	info "source boot image args: ${fmt}"
 
+	# unpack_bootimg quotes the whole --cmdline value with single quotes,
+	# because the string is meant for `eval`. A shell variable is not
+	# re-parsed for quotes, so expanding $fmt word-by-word leaves the quotes in
+	# place and every space inside the cmdline becomes a separate argument.
+	# Split it with shlex instead of eval, so nothing in the source image's
+	# cmdline can ever reach the shell.
+	local -a mkargs
+	mapfile -d '' -t mkargs < <(
+		python3 -c 'import shlex, sys; sys.stdout.write("\0".join(shlex.split(sys.argv[1])))' "$fmt"
+	)
+	[ "${#mkargs[@]}" -gt 0 ] || die "could not parse the source boot image args"
+
 	python3 "${tools}/unpack_bootimg.py" --boot_img boot-source.img >/dev/null \
 		|| die "failed to unpack the source boot image"
 
 	cp "${BOOT_OUT}/${KERNEL_IMAGE_NAME}" "${WORKSPACE}/out/kernel" \
 		|| die "could not stage the new kernel into the unpacked ramdisk"
 
-	# shellcheck disable=SC2086
-	python3 "${tools}/mkbootimg.py" $fmt -o boot.img || die "mkbootimg failed"
+	python3 "${tools}/mkbootimg.py" "${mkargs[@]}" -o boot.img || die "mkbootimg failed"
 	[ -s "${WORKSPACE}/boot.img" ] || die "boot.img was not produced"
 
 	ok "boot.img built ($(du -h "${WORKSPACE}/boot.img" | cut -f1))"
